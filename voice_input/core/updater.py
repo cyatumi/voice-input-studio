@@ -1,0 +1,201 @@
+"""Self-update for the portable (PyInstaller --onefile) build.
+
+The app fetches a tiny JSON manifest hosted on Dropbox.  If it advertises a
+newer version, the user is prompted (see app.py); on confirmation the new
+``.exe`` is downloaded and a small batch helper swaps it in *after* this
+process exits, then relaunches it.
+
+Why a batch helper?  Windows will not let a running ``.exe`` overwrite itself.
+The helper polls until our PID is gone, then ``move``-overwrites the file and
+restarts it.
+
+Distribution model (decided with the user):
+  * Recipients get a ZIP — they unzip and run ``VoiceInputStudio.exe`` (no
+    installer; "Time Seeker" style).
+  * Auto-update downloads only the new ``.exe`` (smaller than the full ZIP).
+  * Hosting is Dropbox direct-download links (``?dl=1``).
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, Optional
+
+from voice_input import __version__ as CURRENT_VERSION
+
+# ---------------------------------------------------------------------------
+# CONFIG — replace with YOUR Dropbox direct link to version.json.
+#
+#   * MUST end with ?dl=1 so Dropbox serves the raw file (not the HTML page).
+#   * MUST stay constant forever.  To publish a new release you OVERWRITE the
+#     version.json file in place on Dropbox; the share link does not change.
+#
+# Until a real link is set (still contains REPLACE_ME), update checks are a
+# silent no-op, so the app runs fine without it.
+# ---------------------------------------------------------------------------
+MANIFEST_URL = "https://www.dropbox.com/scl/fi/REPLACE_ME/version.json?rlkey=REPLACE_ME&dl=1"
+
+_TIMEOUT = 15
+_HEADERS = {"User-Agent": "VoiceInputStudio-Updater"}
+_NEW_EXE_NAME = "VoiceInputStudio.new.exe"
+
+
+@dataclass
+class UpdateInfo:
+    version: str
+    url: str
+    notes: str = ""
+
+
+# --- version comparison ------------------------------------------------------
+
+def _parse_version(v: str) -> tuple[int, int, int]:
+    """Parse 'v1.5.0' / '1.5' / '1.5.0-beta' → (1, 5, 0).  Lenient by design."""
+    parts: list[int] = []
+    for chunk in str(v).strip().lstrip("vV").split("."):
+        num = ""
+        for ch in chunk:
+            if ch.isdigit():
+                num += ch
+            else:
+                break
+        parts.append(int(num) if num else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return parts[0], parts[1], parts[2]
+
+
+def is_newer(remote: str, local: str) -> bool:
+    return _parse_version(remote) > _parse_version(local)
+
+
+def is_frozen() -> bool:
+    """True when running as the packaged PyInstaller exe (not `python -m`)."""
+    return bool(getattr(sys, "frozen", False))
+
+
+def is_configured() -> bool:
+    return "REPLACE_ME" not in MANIFEST_URL
+
+
+# --- network -----------------------------------------------------------------
+
+def _open(url: str):
+    req = urllib.request.Request(url, headers=_HEADERS)
+    return urllib.request.urlopen(req, timeout=_TIMEOUT)
+
+
+def check_for_update() -> Optional[UpdateInfo]:
+    """Return UpdateInfo when the manifest advertises a newer version.
+
+    Returns None on: not configured, no newer version, or ANY network/parse
+    error — update checks must never block or crash startup.
+    """
+    if not is_configured():
+        return None
+    try:
+        with _open(MANIFEST_URL) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    remote = str(data.get("version", "")).strip()
+    url = str(data.get("exe_url", "")).strip()
+    notes = str(data.get("notes", "")).strip()
+    if not remote or not url:
+        return None
+    if not is_newer(remote, CURRENT_VERSION):
+        return None
+    return UpdateInfo(version=remote, url=url, notes=notes)
+
+
+def _target_exe() -> Path:
+    """Path of the exe to replace (the currently running --onefile launcher)."""
+    return Path(sys.executable)
+
+
+def can_write_target() -> bool:
+    """True if we can write into the folder holding the running exe.
+
+    Unzipped to Desktop/Documents → yes.  Unzipped into Program Files → no
+    (needs admin), so we warn the user instead of failing silently later.
+    """
+    folder = _target_exe().parent
+    probe = folder / ".vis_write_test.tmp"
+    try:
+        probe.write_text("x", encoding="ascii")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def download_exe(
+    url: str,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
+) -> Path:
+    """Stream the new exe to a sidecar file next to the current exe.
+
+    progress_cb(bytes_read, total_bytes) is called as data arrives
+    (total_bytes is 0 if the server omits Content-Length).
+    """
+    dst_dir = _target_exe().parent if is_frozen() else Path(tempfile.gettempdir())
+    dst = dst_dir / _NEW_EXE_NAME
+    with _open(url) as resp:
+        total = int(resp.headers.get("Content-Length", 0) or 0)
+        read = 0
+        with open(dst, "wb") as f:
+            while True:
+                chunk = resp.read(256 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+                read += len(chunk)
+                if progress_cb:
+                    progress_cb(read, total)
+    return dst
+
+
+def apply_update_and_restart(new_exe: Path) -> None:
+    """Swap *new_exe* over the running exe after exit, then relaunch.
+
+    Only valid in frozen --onefile mode.  Spawns a detached batch helper that
+    waits for our PID to disappear, overwrites the exe, restarts it, and
+    deletes itself.  The caller must quit the app immediately afterwards.
+    """
+    if not is_frozen():
+        raise RuntimeError("開発モードでは自動更新できません。配布版(.exe)で実行してください。")
+
+    target = _target_exe()
+    pid = os.getpid()
+    bat = Path(tempfile.gettempdir()) / "vis_update.bat"
+
+    # ping is used as a portable ~1s sleep (timeout.exe misbehaves when stdin
+    # is detached).  find on the PID column detects when our process is gone.
+    script = (
+        "@echo off\r\n"
+        "chcp 65001 >nul\r\n"
+        ":waitloop\r\n"
+        f'tasklist /fi "PID eq {pid}" 2>nul | find "{pid}" >nul\r\n'
+        "if not errorlevel 1 (\r\n"
+        "    ping -n 2 127.0.0.1 >nul\r\n"
+        "    goto waitloop\r\n"
+        ")\r\n"
+        f'move /y "{new_exe}" "{target}" >nul\r\n'
+        f'start "" "{target}"\r\n'
+        'del "%~f0"\r\n'
+    )
+    bat.write_text(script, encoding="ascii", errors="ignore")
+
+    DETACHED_PROCESS = 0x00000008
+    CREATE_NEW_PROCESS_GROUP = 0x00000200
+    subprocess.Popen(
+        ["cmd", "/c", str(bat)],
+        creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+        close_fds=True,
+    )

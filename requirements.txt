@@ -1,0 +1,12 @@
+# Core dependencies
+PySide6>=6.6.0          # GUI framework (tray, settings, indicator overlay)
+sounddevice>=0.4.6      # Microphone capture
+numpy>=1.26.0           # Audio buffer manipulation
+openai>=1.50.0          # Whisper API for STT
+google-generativeai>=0.8.0  # Gemini API for text refinement
+pyperclip>=1.8.2        # Clipboard operations
+pywin32>=306            # Windows-specific APIs (SendInput, foreground window)
+Pillow>=10.0.0          # Multi-resolution ICO generation for the app icon
+
+# Build / packaging
+pyinstaller>=6.0.0      # Build standalone .exe

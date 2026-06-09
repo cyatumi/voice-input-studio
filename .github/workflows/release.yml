@@ -1,0 +1,98 @@
+name: Build and Release
+
+# バージョンタグ (例: v1.5.1) を push すると、Windows上で .exe をビルドし
+# GitHub Releases に ZIP・exe・version.json を自動公開します。
+# 配布済みアプリは releases/latest/download/version.json を見て自動更新します。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # リリース作成に必要
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Set version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          (Get-Content voice_input/__init__.py -Raw) `
+            -replace '__version__\s*=\s*"[^"]*"', "__version__ = `"$v`"" |
+            Set-Content voice_input/__init__.py -Encoding utf8 -NoNewline
+          Write-Host "Building version $v"
+
+      - name: Build exe (PyInstaller)
+        shell: pwsh
+        run: |
+          $iconArg = @()
+          if (Test-Path "assets/app.ico") { $iconArg = @("--icon", "assets/app.ico") }
+          pyinstaller `
+            --name VoiceInputStudio `
+            --windowed `
+            --onefile `
+            --noconsole `
+            --add-data "assets;assets" `
+            --collect-submodules PySide6 `
+            --hidden-import google.generativeai `
+            @iconArg `
+            voice_input/__main__.py
+          if (-not (Test-Path "dist/VoiceInputStudio.exe")) {
+            Write-Error ".exe が生成されませんでした"; exit 1
+          }
+
+      - name: Package release assets
+        shell: pwsh
+        env:
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist/VoiceInputStudio.exe release/VoiceInputStudio.exe -Force
+
+          # 自動更新マニフェスト。exe_url は「最新リリースの固定URL」=永続的。
+          $exeUrl = "https://github.com/${{ github.repository }}/releases/latest/download/VoiceInputStudio.exe"
+          $manifest = [ordered]@{
+            version = "${{ steps.ver.outputs.version }}"
+            exe_url = $exeUrl
+            notes   = "$env:NOTES"
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content release/version.json -Encoding utf8
+
+          # 初回配布用ZIP (exe + ガイド)
+          $zipItems = @("dist/VoiceInputStudio.exe")
+          $guide = "release/はじめにお読みください.txt"
+          if (Test-Path $guide) { $zipItems += $guide }
+          Compress-Archive -Path $zipItems -DestinationPath "release/VoiceInputStudio-${{ github.ref_name }}.zip" -Force
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          $zip = (Get-ChildItem release/VoiceInputStudio-*.zip | Select-Object -First 1).FullName
+          gh release create "${{ github.ref_name }}" `
+            "release/VoiceInputStudio.exe" `
+            "release/version.json" `
+            "$zip" `
+            --title "${{ github.ref_name }}" `
+            --notes "$env:NOTES"
