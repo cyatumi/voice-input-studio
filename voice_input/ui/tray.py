@@ -17,7 +17,7 @@ from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtGui import QColor, QCursor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
-from voice_input import __version__
+from voice_input import __display_name__, __version__
 
 
 # ---------------------------------------------------------------------------
@@ -104,11 +104,11 @@ class TrayController:
         self._menu.addSeparator()
         self._menu.addAction("✕  終了",               on_quit)
         self._menu.addSeparator()
-        _ver = self._menu.addAction(f"Voice Input Studio  v{__version__}")
+        _ver = self._menu.addAction(f"{__display_name__}  v{__version__}")
         _ver.setEnabled(False)  # non-clickable footer showing the version
 
         self.tray = QSystemTrayIcon(self._icon_idle)
-        self.tray.setToolTip("Voice Input Studio\n右クリック: メニュー\n左クリック: 録音")
+        self.tray.setToolTip(f"{__display_name__}\n右クリック: メニュー\n左クリック: 録音")
         self.tray.activated.connect(self._on_activated)
         self.tray.show()
 
@@ -125,9 +125,9 @@ class TrayController:
     def set_recording(self, recording: bool) -> None:
         self.tray.setIcon(self._icon_recording if recording else self._icon_idle)
         self.tray.setToolTip(
-            "Voice Input Studio — 録音中\n左クリック: 停止"
+            f"{__display_name__} — 録音中\n左クリック: 停止"
             if recording else
-            "Voice Input Studio\n右クリック: メニュー\n左クリック: 録音"
+            f"{__display_name__}\n右クリック: メニュー\n左クリック: 録音"
         )
 
     def notify(self, title: str, message: str) -> None:

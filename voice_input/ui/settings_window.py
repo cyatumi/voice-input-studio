@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from .. import __display_name__
 from ..core import config, importer
 from ..core import recorder as rec_mod
 from ..core import settings as settings_mod
@@ -74,7 +75,7 @@ class SettingsWindow(QDialog):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Voice Input Studio — 設定")
+        self.setWindowTitle(f"{__display_name__} — 設定")
         self.resize(820, 620)
 
         self._settings = settings_mod.load_settings()

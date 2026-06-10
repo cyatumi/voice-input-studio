@@ -11,6 +11,7 @@ import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from voice_input import __display_name__
 from voice_input.app import AppController
 
 
@@ -34,8 +35,8 @@ def main() -> int:
         _app = QApplication(sys.argv)
         QMessageBox.information(
             None,
-            "Voice Input Studio",
-            "Voice Input Studio はすでに起動しています。\n\n"
+            __display_name__,
+            f"{__display_name__} はすでに起動しています。\n\n"
             "タスクバー右下の ^ をクリックしてマイクアイコンを探してください。",
         )
         return 0
@@ -45,6 +46,8 @@ def main() -> int:
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough,
     )
     app = QApplication(sys.argv)
+    app.setApplicationName(__display_name__)
+    app.setApplicationDisplayName(__display_name__)
     app.setQuitOnLastWindowClosed(False)  # tray app — closing settings shouldn't kill us
 
     controller = AppController(app)  # noqa: F841  (kept alive via the QApplication)
