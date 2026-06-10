@@ -1,9 +1,9 @@
-; Inno Setup script — wrap VoiceInputStudio.exe into a Windows installer.
+﻿; Inno Setup script 窶・wrap VoiceInputStudio.exe into a Windows installer.
 ; Build with: ISCC.exe scripts\installer.iss
 ; Output: dist\VoiceInputStudio-Setup.exe
 
 #define MyAppName "Voice Input Studio"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.5.2"
 #define MyAppPublisher "Voice Input Studio"
 #define MyAppExeName "VoiceInputStudio.exe"
 
@@ -29,17 +29,18 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "startupicon"; Description: "Windows起動時に自動で起動する"; GroupDescription: "追加タスク"; Flags: unchecked
-Name: "desktopicon"; Description: "デスクトップにショートカットを作成"; GroupDescription: "追加タスク"; Flags: unchecked
+Name: "startupicon"; Description: "Windows襍ｷ蜍墓凾縺ｫ閾ｪ蜍輔〒襍ｷ蜍輔☆繧・; GroupDescription: "霑ｽ蜉繧ｿ繧ｹ繧ｯ"; Flags: unchecked
+Name: "desktopicon"; Description: "繝・せ繧ｯ繝医ャ繝励↓繧ｷ繝ｧ繝ｼ繝医き繝・ヨ繧剃ｽ懈・"; GroupDescription: "霑ｽ蜉繧ｿ繧ｹ繧ｯ"; Flags: unchecked
 
 [Files]
 Source: "..\dist\VoiceInputStudio.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\アンインストール"; Filename: "{uninstallexe}"
+Name: "{group}\繧｢繝ｳ繧､繝ｳ繧ｹ繝医・繝ｫ"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startupicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "今すぐ起動"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "莉翫☆縺占ｵｷ蜍・; Flags: nowait postinstall skipifsilent
+
