@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Input Studio - 音声入力をもっと賢く</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f13;
+      color: #e8e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      width: 100%;
+      max-width: 720px;
+      padding: 80px 24px 60px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #1e1e2e;
+      border: 1px solid #3a3a5c;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      color: #a0a0c0;
+      margin-bottom: 24px;
+      letter-spacing: 0.05em;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 700;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff 40%, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: #9090b0;
+      line-height: 1.7;
+      margin-bottom: 44px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── Download Button ── */
+    .dl-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 64px;
+    }
+
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      text-decoration: none;
+      font-size: 1.15rem;
+      font-weight: 600;
+      padding: 18px 40px;
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(124, 58, 237, 0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .dl-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(124, 58, 237, 0.6);
+    }
+    .dl-btn:active { transform: translateY(0); }
+
+    .dl-btn svg {
+      width: 22px; height: 22px;
+      flex-shrink: 0;
+    }
+
+    .dl-meta {
+      font-size: 12px;
+      color: #5a5a7a;
+    }
+
+    /* ── Features ── */
+    .features {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 24px 80px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #1a1a28;
+      border: 1px solid #2a2a42;
+      border-radius: 12px;
+      padding: 24px 20px;
+    }
+    .card .icon { font-size: 1.8rem; margin-bottom: 12px; }
+    .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; color: #d0d0e8; }
+    .card p  { font-size: 0.82rem; color: #6a6a8a; line-height: 1.6; }
+
+    /* ── How to install ── */
+    .steps {
+      width: 100%;
+      max-width: 720px;
+      padding: 0 24px 80px;
+    }
+    .steps h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #b0b0d0;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      background: #1a1a28;
+      border: 1px solid #2a2a42;
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: #2d1f6e;
+      border: 1px solid #4f46e5;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700; color: #a78bfa;
+    }
+    .step-text { font-size: 0.9rem; color: #b0b0cc; line-height: 1.5; padding-top: 3px; }
+    .step-text strong { color: #e0e0f0; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 24px;
+      font-size: 12px;
+      color: #3a3a5a;
+      text-align: center;
+    }
+    footer a { color: #5a5a8a; text-decoration: none; }
+    footer a:hover { color: #9090c0; }
+  </style>
+</head>
+<body>
+
+  <section class="hero">
+    <div class="badge">Windows 10 / 11</div>
+    <h1>Voice Input Studio</h1>
+    <p class="subtitle">
+      どのアプリでも使える音声入力ツール。<br>
+      しゃべるだけで、AI が自動で整えて入力します。
+    </p>
+
+    <div class="dl-wrap">
+      <a class="dl-btn"
+         href="https://github.com/cyatumi/voice-input-studio/releases/latest/download/VoiceInputStudio.exe"
+         download>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        無料ダウンロード
+      </a>
+      <span class="dl-meta">約97MB &nbsp;·&nbsp; インストール不要（.exe そのまま実行）</span>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="card">
+      <div class="icon">🎤</div>
+      <h3>どこでも音声入力</h3>
+      <p>メモ帳・ブラウザ・チャットアプリなど、あらゆる入力欄に対応</p>
+    </div>
+    <div class="card">
+      <div class="icon">✨</div>
+      <h3>AI で自動整形</h3>
+      <p>Gemini / GPT / Claude に対応。話し言葉をきれいな文章に変換</p>
+    </div>
+    <div class="card">
+      <div class="icon">⚡</div>
+      <h3>ショートカット起動</h3>
+      <p>Ctrl+Shift+Y でいつでも即座に録音開始・停止</p>
+    </div>
+    <div class="card">
+      <div class="icon">📋</div>
+      <h3>定型文・住所入力</h3>
+      <p>よく使う文章や住所を声で一発呼び出し</p>
+    </div>
+  </section>
+
+  <section class="steps">
+    <h2>使い始めるまで 3 ステップ</h2>
+    <div class="step-list">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>ダウンロード</strong> — 上のボタンを押して .exe を保存</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>そのまま実行</strong> — インストール不要。ダブルクリックで起動</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>API キーを設定</strong> — 設定画面から Gemini / OpenAI のキーを入力して完了</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/cyatumi/voice-input-studio">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/cyatumi/voice-input-studio/releases">リリース履歴</a>
+  </footer>
+
+</body>
+</html>
