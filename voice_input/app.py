@@ -48,6 +48,7 @@ class AppController(QObject):
     _sig_notify    = Signal(str, str)  # (title, body)  → tray.notify
     _sig_snippet   = Signal()          #                → _handle_snippet_trigger
     _sig_address   = Signal()          #                → _handle_address_trigger
+    _sig_proc_end  = Signal()          #                → _end_processing (hide 翻訳中)
 
     # Auto-update signals (emitted from the background update-check / download
     # threads; delivered to the Qt main thread so dialogs are created safely).
@@ -95,6 +96,7 @@ class AppController(QObject):
         self._sig_notify.connect(self._on_notify)
         self._sig_snippet.connect(self._handle_snippet_trigger)
         self._sig_address.connect(self._handle_address_trigger)
+        self._sig_proc_end.connect(self._end_processing)
 
         # Auto-update wiring
         self._update_dlg = None            # active QProgressDialog, if any
@@ -337,9 +339,18 @@ class AppController(QObject):
         wav = self.recorder.stop()
         self.recorder = None
         self.tray.set_recording(False)
-        self.indicator.hide()
+        # Keep the indicator on screen in a "翻訳中" state while the cloud STT
+        # (and optional refine) runs, so the user has clear feedback that the
+        # app is working. It is dismissed when text is inserted (_do_insert) or
+        # on any error / early-return path (_sig_proc_end → _end_processing).
+        if self.settings.indicator_enabled:
+            self.indicator.set_processing(True)
+        else:
+            self.indicator.hide()
 
         if not wav:
+            self.indicator.set_processing(False)
+            self.indicator.hide()
             self.tray.notify("録音データなし", "マイクが正しく選択されているか設定で確認してください。")
             return
 
@@ -354,6 +365,7 @@ class AppController(QObject):
             # Use signal — QTimer.singleShot() silently does nothing from a
             # plain threading.Thread (no Qt event loop in that thread).
             self._sig_notify.emit("文字起こし失敗", str(e))
+            self._sig_proc_end.emit()
             self._busy = False
             return
 
@@ -364,16 +376,19 @@ class AppController(QObject):
                 "音声を認識できませんでした",
                 "もう少しはっきり・長めに話してみてください。",
             )
+            self._sig_proc_end.emit()
             self._busy = False
             return
 
         # Voice command triggers — handled on the GUI thread via signals.
         if SNIPPET_TRIGGER in text:
             self._sig_snippet.emit()
+            self._sig_proc_end.emit()
             self._busy = False
             return
         if ADDRESS_TRIGGER in text:
             self._sig_address.emit()
+            self._sig_proc_end.emit()
             self._busy = False
             return
 
@@ -423,6 +438,12 @@ class AppController(QObject):
         self.tray.notify(title, message)
 
     @Slot()
+    def _end_processing(self) -> None:
+        """Dismiss the 翻訳中 indicator on pipeline paths that don't insert text."""
+        self.indicator.set_processing(False)
+        self.indicator.hide()
+
+    @Slot()
     def _poll_level(self) -> None:
         """Read recorder's latest audio level and push to indicator (main thread)."""
         if self.recorder and self.recorder.is_recording:
@@ -468,6 +489,9 @@ class AppController(QObject):
                 QTimer.singleShot(500, self.clipboard_watcher.resume)
         if method == "clipboard":
             self.tray.notify("クリップボードにコピー", text[:60])
+        # Translation finished and text inserted — dismiss the 翻訳中 indicator.
+        self.indicator.set_processing(False)
+        self.indicator.hide()
         # "入力完了" 通知は省略 — Windows トースト通知がブラウザ通知と
         # 混同されやすいため。エラー時のみ通知する。
         self.pipeline_finished.emit(text)

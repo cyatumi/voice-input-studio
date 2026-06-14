@@ -33,6 +33,8 @@ class Recorder:
         self._lock = threading.Lock()
         self._recording = False
         self._current_level: float = 0.0   # polled by main thread via QTimer
+        self._agc_floor: float | None = None   # adaptive noise-floor (int16 RMS)
+        self._agc_peak: float | None = None    # adaptive signal-peak (int16 RMS)
 
     @property
     def is_recording(self) -> bool:
@@ -46,8 +48,36 @@ class Recorder:
             self._frames.append(indata.copy())
         try:
             rms = float(np.sqrt(np.mean(indata.astype(np.float32) ** 2)))
-            # Normalize: int16 range is ±32768; pcm float comes back ~±1.0 already.
-            level = min(1.0, rms / 6553.6) if indata.dtype == np.int16 else min(1.0, rms * 5.0)
+            if indata.dtype != np.int16:
+                rms *= 32768.0             # bring float PCM (~±1.0) onto the int16 scale
+
+            # Auto-gain so the dancing character reacts well on ANY microphone,
+            # quiet or loud. A fixed mapping can't satisfy both "dances on
+            # speech" and "still on silence" across mics (a very quiet mic's
+            # speech RMS can be ~90 — 1/5 of normal). Instead we learn this
+            # mic's own noise floor and signal peak and report where the live
+            # level sits between them.
+            SPAN_MIN = 60.0
+            if self._agc_floor is None:    # first frame → calibrate to this mic
+                self._agc_floor = rms
+                self._agc_peak = rms + SPAN_MIN
+            # Floor: follow downward fast, upward slowly (speech can't raise it).
+            if rms < self._agc_floor:
+                self._agc_floor += (rms - self._agc_floor) * 0.10
+            else:
+                self._agc_floor += (rms - self._agc_floor) * 0.02
+            # Peak: follow upward fast, downward slowly.
+            if rms > self._agc_peak:
+                self._agc_peak += (rms - self._agc_peak) * 0.30
+            else:
+                self._agc_peak += (rms - self._agc_peak) * 0.02
+            span = max(self._agc_peak - self._agc_floor, SPAN_MIN)
+            gate = self._agc_floor + 0.15 * span     # below this = treated as silence
+            denom = self._agc_peak - gate
+            if denom <= 0:
+                level = 0.0
+            else:
+                level = min(1.0, max(0.0, rms - gate) / denom) ** 0.6
             # Store for main-thread polling — avoids cross-thread Signal.emit()
             # from PortAudio's native C thread which can silently drop Qt events.
             self._current_level = level
@@ -60,6 +90,8 @@ class Recorder:
         if self._recording:
             return
         self._frames = []
+        self._agc_floor = None       # recalibrate auto-gain for this session
+        self._agc_peak = None
         self._stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
