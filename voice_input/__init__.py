@@ -1,6 +1,6 @@
 import sys
 
-__version__ = "1.5.3"
+__version__ = "1.5.4"
 __app_name__ = "VoiceInputStudio"
 
 # ソースから直起動した「マスター（開発版）」か、配布された exe（配布版）かを判別。

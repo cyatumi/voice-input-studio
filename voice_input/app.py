@@ -16,7 +16,7 @@ from .core import settings as settings_mod
 from .core import updater
 from .core.clipboard_history import ClipboardEntry, ClipboardWatcher, HistoryStore
 from .core.hotkey import HotkeyManager
-from .core.inserter import insert as inserter_dispatch
+from .core.inserter import insert as inserter_dispatch, copy_only as inserter_copy
 from .core.recorder import Recorder
 from .core.refiner import GeminiRefiner, OpenAIRefiner
 from .core.stt import WhisperSTT
@@ -487,6 +487,11 @@ class AppController(QObject):
         finally:
             if method == "paste":
                 QTimer.singleShot(500, self.clipboard_watcher.resume)
+        # 安全網: 貼り付け先が選ばれていなくても文字を失わないよう、文字起こし結果を
+        # 必ずクリップボードと履歴にも残す（Ctrl+V / 履歴ポップアップで復旧できる）。
+        # method=="clipboard" は既にコピー済みなので二重処理しない。
+        if method != "clipboard" and getattr(self.settings, "always_copy_to_clipboard", True):
+            self._stash_to_clipboard(text)
         if method == "clipboard":
             self.tray.notify("クリップボードにコピー", text[:60])
         # Translation finished and text inserted — dismiss the 翻訳中 indicator.
@@ -495,6 +500,21 @@ class AppController(QObject):
         # "入力完了" 通知は省略 — Windows トースト通知がブラウザ通知と
         # 混同されやすいため。エラー時のみ通知する。
         self.pipeline_finished.emit(text)
+
+    def _stash_to_clipboard(self, text: str) -> None:
+        """文字起こし結果をクリップボードと履歴に保存し、いつでも復旧できるようにする。"""
+        if not text:
+            return
+        try:
+            inserter_copy(text)  # クリップボードへコピー（貼付はしない）
+        except Exception:
+            pass
+        try:
+            self.clipboard_store.add(
+                ClipboardEntry(text=text, timestamp=datetime.now().isoformat())
+            )
+        except Exception:
+            pass
 
     # --- Clipboard history --------------------------------------------------
 

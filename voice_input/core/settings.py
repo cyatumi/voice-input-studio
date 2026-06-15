@@ -115,6 +115,9 @@ class AppSettings:
     #   "paste"     — クリップボード経由 + Ctrl+V (互換性重視)
     #   "clipboard" — クリップボードにコピーのみ (貼付しない)
     input_method: str = "paste"
+    # 安全網: 貼り付け先が選ばれていなくても文字を失わないよう、文字起こし結果を
+    # 必ずクリップボードと履歴にも残す（Ctrl+V / 履歴で復旧できる）。
+    always_copy_to_clipboard: bool = True
     auto_paste: bool = True       # Legacy; kept for backward compatibility with old configs
     play_sound_on_start: bool = True
     play_sound_on_stop: bool = True
